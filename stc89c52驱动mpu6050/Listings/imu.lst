@@ -1,0 +1,163 @@
+C51 COMPILER V9.54   IMU                                                                   09/25/2021 09:03:30 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE IMU
+OBJECT MODULE PLACED IN .\Objects\imu.obj
+COMPILER INVOKED BY: C:\xuexigongju\keil\C51\BIN\C51.EXE imu.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listi
+                    -ngs\imu.lst) TABS(2) OBJECT(.\Objects\imu.obj)
+
+line level    source
+
+   1          #include "imu.h"
+   2          #include "MPU_6050.h"
+   3          #include "My_Math.h"
+   4          #include "math.h"
+   5          
+   6          //Ë½ÓÐ±äÁ¿Çø
+   7          Attitude_t g_Attitude;    //µ±Ç°½Ç¶È×ËÌ¬Öµ
+   8          float NormAccz;
+   9          
+  10          /******************************************************************************
+  11            * º¯ÊýÃû³Æ£ºGetAngle
+  12            * º¯ÊýÃèÊö£º¸ù¾Ý´«¸ÐÆ÷Êý¾Ý¼ÆËãµÃµ½µ±Ç°×ËÌ¬
+  13            * Êä    Èë£ºconst MPU6050Manager_t *pMpu£ºÔ­Ê¼´«¸ÐÆ÷Êý¾Ý
+  14                         float dt£ºµ¥Î»ÔËÐÐÊ±¼ä
+  15            * Êä    ³ö£ºAttitude_t *pAngE£ºÊä³ö½Ç¶ÈÖµ
+  16            * ·µ    »Ø£ºvoid
+  17            * ±¸    ×¢£ºnull    
+  18            *    
+  19            *
+  20          ******************************************************************************/
+  21          static Quaternion NumQ = {1, 0, 0, 0};
+  22          static float vecxZ,vecyZ,veczZ;
+  23          static float wz_acc_tmp[2];
+  24          void ATT_Update(const _MPU6050_Data *pMpu,Attitude_t *pAngE, float dt) 
+  25          {
+  26   1        volatile struct V{
+  27   1              float x;
+  28   1              float y;
+  29   1              float z;
+  30   1              } Gravity,Acc,Gyro,AccGravity;
+  31   1      
+  32   1          static  float KpDef = 0.4f; //ËÄÔªÊýÊÕÃãÖµ
+  33   1      
+  34   1          float q0_t,q1_t,q2_t,q3_t;
+  35   1          float NormQuat; 
+  36   1          float HalfTime = dt * 0.5f;
+  37   1      
+  38   1          Gravity.x = 2 * (NumQ.q1 * NumQ.q3 - NumQ.q0 * NumQ.q2);                
+  39   1          Gravity.y = 2 * (NumQ.q0 * NumQ.q1 + NumQ.q2 * NumQ.q3);              
+  40   1          Gravity.z = 1 - 2 * (NumQ.q1 * NumQ.q1 + NumQ.q2 * NumQ.q2);  
+  41   1          // ¼ÓËÙ¶È¹éÒ»»¯£¬
+  42   1          NormQuat = Q_rsqrt(squa(MPU6050_Data.Acc_X)+ squa(MPU6050_Data.Acc_Y) +squa(MPU6050_Data.Acc_Z));
+  43   1      
+  44   1          Acc.x = pMpu->Acc_X * NormQuat; //¹éÒ»ºó¿É»¯Îªµ¥Î»ÏòÁ¿ÏÂ·½Ïò·ÖÁ¿
+  45   1          Acc.y = pMpu->Acc_Y * NormQuat;  
+  46   1          Acc.z = pMpu->Acc_Z * NormQuat;  
+  47   1      
+  48   1          //ÏòÁ¿²æ³ËµÃ³öµÄÖµ£¬²æ³Ëºó¿ÉÒÔµÃµ½Ðý×ª¾ØÕóµÄÖØÁ¦·ÖÁ¿ÔÚÐÂµÄ¼ÓËÙ¶È·ÖÁ¿ÉÏµÄÆ«²î
+  49   1          AccGravity.x = (Acc.y * Gravity.z - Acc.z * Gravity.y);
+  50   1          AccGravity.y = (Acc.z * Gravity.x - Acc.x * Gravity.z);
+  51   1          AccGravity.z = (Acc.x * Gravity.y - Acc.y * Gravity.x);
+  52   1      
+  53   1          //½ÇËÙ¶ÈÈÚºÏ¼ÓËÙ¶È±ÈÀý²¹³¥Öµ£¬ÓëÉÏÃæÈý¾ä¹²Í¬ÐÎ³ÉÁËPI²¹³¥£¬µÃµ½½ÃÕýºóµÄ½ÇËÙ¶ÈÖµ
+  54   1          Gyro.x = pMpu->Gyro_X * Gyro_Gr + KpDef * AccGravity.x;//»¡¶ÈÖÆ£¬´Ë´¦²¹³¥µÄÊÇ½ÇËÙ¶ÈµÄÆ¯ÒÆ
+C51 COMPILER V9.54   IMU                                                                   09/25/2021 09:03:30 PAGE 2   
+
+  55   1          Gyro.y = pMpu->Gyro_Y * Gyro_Gr + KpDef * AccGravity.y;
+  56   1          Gyro.z = pMpu->Gyro_Z * Gyro_Gr + KpDef * AccGravity.z; 
+  57   1          
+  58   1          // Ò»½×Áú¸ñ¿âËþ·¨, ¸üÐÂËÄÔªÊý
+  59   1          //½ÃÕýºóµÄ½ÇËÙ¶ÈÖµ»ý·Ö£¬µÃµ½Á½´Î×ËÌ¬½âËãÖÐËÄÔªÊýÒ»¸öÊµ²¿Q0£¬Èý¸öÐé²¿Q1~3µÄÖµµÄ±ä»¯
+  60   1          q0_t = (-NumQ.q1 * Gyro.x - NumQ.q2 * Gyro.y - NumQ.q3 * Gyro.z) * HalfTime;
+  61   1          q1_t = ( NumQ.q0 * Gyro.x - NumQ.q3 * Gyro.y + NumQ.q2 * Gyro.z) * HalfTime;
+  62   1          q2_t = ( NumQ.q3 * Gyro.x + NumQ.q0 * Gyro.y - NumQ.q1 * Gyro.z) * HalfTime;
+  63   1          q3_t = (-NumQ.q2 * Gyro.x + NumQ.q1 * Gyro.y + NumQ.q0 * Gyro.z) * HalfTime;
+  64   1      
+  65   1          //»ý·ÖºóµÄÖµÀÛ¼Óµ½ÉÏ´ÎµÄËÄÔªÊýÖÐ£¬¼´ÐÂµÄËÄÔªÊý
+  66   1          NumQ.q0 += q0_t;
+  67   1          NumQ.q1 += q1_t;
+  68   1          NumQ.q2 += q2_t;
+  69   1          NumQ.q3 += q3_t;
+  70   1          
+  71   1          // ÖØÐÂËÄÔªÊý¹éÒ»»¯£¬µÃµ½µ¥Î»ÏòÁ¿ÏÂ
+  72   1          NormQuat = Q_rsqrt(squa(NumQ.q0) + squa(NumQ.q1) + squa(NumQ.q2) + squa(NumQ.q3)); //µÃµ½ËÄÔªÊýµÄÄ£³¤
+  73   1          NumQ.q0 *= NormQuat; //Ä£³¤¸üÐÂËÄÔªÊýÖµ
+  74   1          NumQ.q1 *= NormQuat;
+  75   1          NumQ.q2 *= NormQuat;
+  76   1          NumQ.q3 *= NormQuat;
+  77   1          
+  78   1          /*»úÌå×ø±êÏµÏÂµÄZ·½ÏòÏòÁ¿*/
+  79   1          vecxZ = 2 * NumQ.q0 *NumQ.q2 - 2 * NumQ.q1 * NumQ.q3 ;                                  /*¾ØÕó(3,1)Ïî*
+             -///µØÀí×ø±êÏµÏÂµÄXÖáµÄÖØÁ¦·ÖÁ¿
+  80   1          vecyZ = 2 * NumQ.q2 *NumQ.q3 + 2 * NumQ.q0 * NumQ.q1;                                   /*¾ØÕó(3,2)Ïî*
+             -///µØÀí×ø±êÏµÏÂµÄYÖáµÄÖØÁ¦·ÖÁ¿
+  81   1          veczZ = NumQ.q0 * NumQ.q0 - NumQ.q1 * NumQ.q1 - NumQ.q2 * NumQ.q2 + NumQ.q3 * NumQ.q3;  /*¾ØÕó(3,3)Ïî*
+             -///µØÀí×ø±êÏµÏÂµÄZÖáµÄÖØÁ¦·ÖÁ¿ 
+  82   1      
+  83   1          NormAccz = -pMpu->Acc_X* vecxZ + pMpu->Acc_Y * vecyZ + pMpu->Acc_Z * veczZ;  /*ZÖá´¹Ö±·½ÏòÉÏµÄ¼ÓËÙ¶È£¬
+             -´ËÖµº­¸ÇÁËÇãÐ±Ê±ÔÚZÖá½ÇËÙ¶ÈµÄÏòÁ¿ºÍ£¬²»ÊÇµ¥´¿ÖØÁ¦¸ÐÓ¦µÃ³öµÄÖµ*/        
+  84   1          wz_acc_tmp[0] = (NormAccz - 2048) * 0.479f;// cm/ss //0.1196f;
+  85   1          wz_acc_tmp[1] += 0.1f *(wz_acc_tmp[0] - wz_acc_tmp[1]);//LPF
+  86   1      //    HeightInfo.Z_Acc = wz_acc_tmp[1];
+  87   1      }
+*** WARNING C280 IN LINE 24 OF imu.c: 'pAngE': unreferenced local variable
+  88          
+  89          
+  90          
+  91          static float t_temp;
+  92          void GetAngle(Attitude_t *pAngE) 
+  93          {
+  94   1        t_temp = LIMIT(1 - squa(2 * (NumQ.q1 * NumQ.q3 - NumQ.q0 * NumQ.q2)),0,1);
+  95   1          //¸üÐÂÅ·À­½Ç
+  96   1      //    pAngE->yaw = -atan2f((2 * NumQ.q1 *NumQ.q2 + 2 * NumQ.q0 * NumQ.q3),(1 - 2 * (NumQ.q2 * NumQ.q2 + Nu
+             -mQ.q3 * NumQ.q3))) * RtA;
+  97   1      //    pAngE->pitch  =  atan2f(2 * (NumQ.q1 * NumQ.q3 - NumQ.q0 * NumQ.q2),my_sqrt(t_temp))* RtA;   //¸©Ñö½
+             -Ç          
+  98   1      //    pAngE->roll  = atan2f(vecyZ,1 - 2 * (NumQ.q1 * NumQ.q1 + NumQ.q2 * NumQ.q2)) * RtA;  //ºá¹ö½Ç
+  99   1      //  //¸üÐÂÅ·À­½Ç
+ 100   1          pAngE->yaw = atan2((2 * NumQ.q1 *NumQ.q2 + 2 * NumQ.q0 * NumQ.q3),(1 - 2 * (NumQ.q2 * NumQ.q2 + NumQ.q
+             -3 * NumQ.q3))) * RtA;
+ 101   1          pAngE->pitch  =  asin(vecxZ)* RtA;   //¸©Ñö½Ç          
+ 102   1          pAngE->roll  = atan2(vecyZ,veczZ) * RtA;  //ºá¹ö½Ç
+ 103   1      }
+ 104          
+ 105          //¸´Î»ËÄÔªÊý
+ 106          void IMU_Reset()
+ 107          {
+ 108   1          NumQ.q0 = 1;
+C51 COMPILER V9.54   IMU                                                                   09/25/2021 09:03:30 PAGE 3   
+
+ 109   1          NumQ.q1 = 0;
+ 110   1          NumQ.q2 = 0;
+ 111   1          NumQ.q3 = 0;
+ 112   1      }
+ 113          
+ 114          /******************************************************************************
+ 115            * º¯ÊýÃû³Æ£ºGetNormAccz
+ 116            * º¯ÊýÃèÊö£º·µ»ØZÖá·½ÏòµÄ¼ÓËÙ¶ÈÖµ
+ 117            * Êä    Èë£ºvoid
+ 118            * Êä    ³ö£º·µ»ØZÖá·½ÏòµÄ¼ÓËÙ¶ÈÖµ
+ 119            * ·µ    »Ø£ºvoid
+ 120            * ±¸    ×¢£ºnull    
+ 121            *
+ 122            *
+ 123          ******************************************************************************/
+ 124          float GetNormAccz(void)
+ 125          {
+ 126   1         return NormAccz;
+ 127   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3236    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     60      85
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

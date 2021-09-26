@@ -1,0 +1,9 @@
+".\Objects\STARTUP.obj",
+".\Objects\main.obj",
+".\Objects\my_IIC.obj",
+".\Objects\MPU_6050.obj",
+".\Objects\USART.obj",
+".\Objects\oled.obj",
+".\Objects\Timer.obj" 
+TO ".\Objects\mpu9250" 
+PRINT(".\Listings\mpu9250.m51") RAMSIZE(256) 

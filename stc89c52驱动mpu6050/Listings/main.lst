@@ -1,0 +1,85 @@
+C51 COMPILER V9.54   MAIN                                                                  09/25/2021 22:29:28 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\xuexigongju\keil\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\List
+                    -ings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include "reg52.h"
+   2          #include "USART.h"
+   3          #include "MPU_6050.h"
+   4          #include "my_IIC.h"
+   5          #include "oled.h"
+   6          #include "Timer.h"
+   7          float Angle = 0;
+   8          unsigned int num = 1;
+   9          void main(void)
+  10          {
+  11   1        USART_Init(); //´®¿Ú³õÊ¼»¯  ²¨ÌØÂÊÎª9600
+  12   1        InitMPU6050();  //mpu6050³õÊ¼»¯
+  13   1        OLED_Init(); //OLED³õÊ¼»¯
+  14   1        Timer0_Init();
+  15   1        for(;;) //Ö÷Ñ­»·
+  16   1        { 
+  17   2          OLED_ShowNum(0,0,(int)Angle,4);
+  18   2          OLED_ShowNum(50,0,MPU6050_Data.Gyro_X+100,4);   //+100ÊÇÎªÁË¼õÐ¡xÔÚ¾²Ö¹×´Ì¬ÏÂµÄXÖáÊý¾ÝµÄÆ¯ÒÆ£¬Ê¹½Ç¶È¾¡Á¿±
+             -£³Ö²»±ä
+  19   2          Read_Mpu6050();
+  20   2          if(MPU6050_Data.Gyro_X > 300 || MPU6050_Data.Gyro_X < -300) //Ö±½Ó¶Ô´Ómpu6050¶ÁÈ¡³öÀ´µÄxÖáÉÏµÄ½ÇËÙ¶È½øÐÐ
+             -»ý·Ö
+  21   2            Angle = (int)(Angle + (MPU6050_Data.Gyro_X+100)*0.0035f);
+  22   2        }
+  23   1      }
+  24          
+  25          
+  26          /*
+  27          ºÍ¶æ»úµÄÍ¨ÐÅÐ­Òé
+  28          'R' + '0'or'1'('0'ËµÃ÷½Ç¶ÈÎª¸º£¬'1'ËµÃ÷½Ç¶ÈÎªÕý) + µ±Ç°½Ç¶È¾ø¶ÔÖµ + '\r' + '\n'
+  29          */
+  30          
+  31          void timer0() interrupt 1
+  32          {
+  33   1        unsigned int send_data_ANGLE;
+  34   1        num += 1;
+  35   1        TH0 = 0X00;     
+  36   1        TL0 = 0X01;
+  37   1        if((num%10) == 0)
+  38   1        {
+  39   2          Uart_Send('R');
+  40   2          if(Angle < 0) //¸º½Ç¶È
+  41   2          {
+  42   3            Uart_Send('0');
+  43   3            send_data_ANGLE = -Angle;
+  44   3          }
+  45   2          else 
+  46   2          {
+  47   3            Uart_Send('1');
+  48   3            send_data_ANGLE = Angle;
+  49   3          }
+  50   2          Uart_Send(send_data_ANGLE);
+  51   2          Uart_Send('\r');
+  52   2          Uart_Send('\n');
+C51 COMPILER V9.54   MAIN                                                                  09/25/2021 22:29:28 PAGE 2   
+
+  53   2        }
+  54   1      }
+  55          
+  56          
+  57          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    300    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      6       2
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
